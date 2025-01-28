@@ -1,14 +1,30 @@
-LD_OPTIONS = -Ttext=0x7C00 -m elf_i386 -entry _start --oformat binary
-DISK = a.out
+LD_MBR_OPTIONS = -Ttext=0x7C00 -m elf_i386 --oformat binary
+DISK = disk.img
 
-run:$(DISK) makefile
+MBR = mbr.out
+#OS = os.out
+
+SRCS = $(wildcard *.s)
+BINS = $(SRCS:.s=.out)
+
+run:$(DISK)
 	qemu-system-i386 -drive format=raw,file=$(DISK)
 
-$(DISK):main.o
-	ld $(LD_OPTIONS) -o $@ $<
+debug:$(DISK)
+	qemu-system-i386 -s -S -drive format=raw,file=$(DISK) &
 
-main.o:main.s
+$(DISK):$(MBR)#$(BINS)
+	dd if=$(MBR) of=$(DISK) conv=notrunc
+
+$(MBR):mbr.o
+	ld $(LD_MBR_OPTIONS) -o $@ $<
+
+%.o:%.s
+	@echo "Processing $< into $@"
 	as --32 $< -o $@
 
 clean:
-	rm -f main.o $(DISK)
+	rm -f *.o *.out
+
+d:
+	gdb -ex "target remote localhost:1234"
