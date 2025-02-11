@@ -1,30 +1,40 @@
-LD_MBR_OPTIONS = -Ttext=0x7C00 -m elf_i386 --oformat binary
+# Linker options
+LD_OPTIONS = -m elf_i386 --oformat binary
+LD_MBR = -Ttext=0x7C00 $(LD_OPTIONS)
+LD_OS = -Ttext=0x7E00 $(LD_OPTIONS)
+
+# Files
 DISK = disk.img
-
 MBR = mbr.out
-#OS = os.out
+OS = os.out
 
-SRCS = $(wildcard *.s)
-BINS = $(SRCS:.s=.out)
+# QEMU options
+QEMU = qemu-system-i386 -nographic -drive format=raw,file=$(DISK)
 
-run:$(DISK)
-	qemu-system-i386 -drive format=raw,file=$(DISK)
+# Rules
+all: $(DISK)
 
-debug:$(DISK)
-	qemu-system-i386 -s -S -drive format=raw,file=$(DISK) &
+run: $(DISK)
+	$(QEMU)
 
-$(DISK):$(MBR)#$(BINS)
+debug: $(DISK)
+	$(QEMU) -s -S
+
+$(DISK): $(MBR) $(OS)
 	dd if=$(MBR) of=$(DISK) conv=notrunc
+	dd if=$(OS)  of=$(DISK) conv=notrunc seek=1
 
-$(MBR):mbr.o
-	ld $(LD_MBR_OPTIONS) -o $@ $<
+$(MBR): mbr.o
+	ld $(LD_MBR) -o $@ $<
 
-%.o:%.s
-	@echo "Processing $< into $@"
+$(OS): os.o
+	ld $(LD_OS) -o $@ $<
+
+%.o: %.s
 	as --32 $< -o $@
 
 clean:
-	rm -f *.o *.out
+	rm -f *.o *.out $(DISK)
 
 d:
 	gdb -ex "target remote localhost:1234"
